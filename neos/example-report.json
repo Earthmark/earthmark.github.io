@@ -26,7 +26,7 @@
   {
     "id": "T-2",
     "name": "Thing 2",
-    "recordType": "world",
+    "recordType": "texture",
     "path": null,
     "neosDBmanifest": [
       {
@@ -50,7 +50,7 @@
   {
     "id": "T-3",
     "name": "Thing 3",
-    "recordType": "item",
+    "recordType": "object",
     "path": "Super/Great/Things",
     "neosDBmanifest": [
       {
@@ -74,7 +74,7 @@
   {
     "id": "T-4",
     "name": "Thing 4",
-    "recordType": "item",
+    "recordType": "object",
     "path": "Super/Great/Things",
     "neosDBmanifest": [
       {
