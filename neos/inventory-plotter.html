@@ -60,8 +60,8 @@
             <p>
                 The simulation will be slow to start, after a short time of it back solving node positions
                 the graph will lock and then it should be highly responsive.
-                Feel free to provide feedback or view the source <a href="https://github.com/Earthmark/earthmark.github.io"
-                    target="_blank">here</a>,
+                Feel free to provide feedback or view the source <a
+                    href="https://github.com/Earthmark/earthmark.github.io" target="_blank">here</a>,
                 if performance issues persist please log an issue.
             </p>
             <p>
@@ -90,17 +90,131 @@
     </div>
     <div id="graph-container"></div>
     <script>
-        const showLabels = document.getElementById('show-labels');
-        const showMime = document.getElementById('show-mime');
 
-        const fileSelector = document.getElementById('file-selector');
-        fileSelector.addEventListener('change', changeEvent => {
+        function convertRecords(rawJson, ignoredAssets) {
+            const records = [];
+            const assets = {};
+            rawJson.forEach(rawRecord => {
+                const record =
+                {
+                    id: rawRecord.id,
+                    label: (rawRecord.path ? rawRecord.path + "\\" : "") + rawRecord.name,
+                    type: rawRecord.recordType,
+                    assets: [],
+                };
+                records.push(record);
+
+                rawRecord.neosDBmanifest.forEach(rawAsset => {
+                    // Omit the core font list, they connect to anything with text.
+                    // Really you'll never get rid of these, and they make the graph
+                    // more difficult to understand.
+                    if (ignoredAssets[rawAsset.hash]) {
+                        return;
+                    }
+
+                    var asset = assets[rawAsset.hash];
+                    if (asset === undefined) {
+                        asset = assets[rawAsset.hash] = {
+                            id: rawAsset.hash,
+                            label: `${rawAsset.hash} ${rawAsset.bytes} bytes`,
+                            type: "asset",
+                            size: rawAsset.bytes,
+                            records: []
+                        };
+                    }
+                    // Because we go through records in sequence,
+                    // we can build a strong key out of the order the nodes are referenced.
+                    asset.records.push(record.id);
+                    record.assets.push(asset);
+                });
+            });
+
+            return {
+                records, assets
+            };
+        }
+
+        function recordsToGraph(convertedData, mergeAssets) {
+            const records = convertedData.records;
+            const assets = convertedData.assets;
+
+            var nodes = [];
+            var links = [];
+
+            if (mergeAssets) {
+                nodes = records;
+
+                // for each record, find all assets where the list of assets are similar.
+                const groups = _.groupBy(assets, 'records');
+                for (const aggregate in groups) {
+                    const group = groups[aggregate];
+                    const size = group.reduce((c, g) => c + g.size, 0);
+                    const node = {
+                        id: group.reduce((a, v) => a != "" ? a + "," + v.label : v.label, ""),
+                        label: `${group.length} nodes, ${size} bytes total<br>` + group.reduce((a, v) => a != "" ? a + "<br>" + v.label : v.label, ""),
+                        size,
+                        type: "asset"
+                    };
+                    nodes.push(node);
+
+                    group[0].records.forEach(r => links.push({
+                        source: r,
+                        target: node
+                    }));
+                }
+            }
+            else {
+                nodes = records.concat(Object.values(assets));
+                links = nodes.flatMap(n => n.assets ? n.assets.map(a => ({ source: n, target: a })) : []);
+            }
+
+            return {
+                nodes,
+                links
+            };
+        }
+
+        function mapColor(type) {
+            switch (type) {
+                case "asset":
+                    return "#f5b84e";
+                case "world":
+                    return "#4e59f5";
+                case "texture":
+                    return "#c64ef5";
+                case "object":
+                    return "#f54e4e";
+            }
+            return "#ffffff";
+        }
+
+        function createGraph(container, graph, locomotion, in3d, showLabelsFunc, logVal, enableDrag) {
+            const myGraph = (in3d ? ForceGraph3D : ForceGraph)({
+                controlType: locomotion
+            });
+            const graphInstance = myGraph(container)
+                .graphData(graph)
+                .nodeLabel(n => {
+                    if (!showLabelsFunc()) {
+                        return;
+                    }
+                    return n.label;
+                }).nodeColor(n => mapColor(n.type))
+                .linkColor(() => in3d ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)')
+                .nodeVal(n => n.size && n.size > 0 ? Math.log(n.size) / Math.log(logVal) : 1)
+                .enableNodeDrag(enableDrag);
+            return graphInstance;
+        }
+
+        document.getElementById('file-selector').addEventListener('change', changeEvent => {
 
             const reader = new FileReader();
             reader.addEventListener('load', loadEvent => {
                 const raw = JSON.parse(loadEvent.target.result);
 
                 // These are the 5 font assets in the core font chain, they connect to anything with text.
+                // Everyone should have these, and they are equally not sensitive to everyone (they are Neos provided).
+                // In the future, this can change to detecting assets with a high level of connectivity.
                 const coreFontList = {
                     "bcda0bcc22bab28ea4fedae800bfbf9ec76d71cc3b9f851779a35b7e438a839d": true,
                     "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5": true,
@@ -109,124 +223,40 @@
                     "23e7ad7cb0a5a4cf75e07c9e0848b1eb06bba15e8fa9b8cb0579fc823c532927": true
                 };
 
-                // Navigation modes
+                // TODO
                 // culling modes
                 //  clusters
                 // merge strong components
-                // merge strong assets
                 // better size collectively
                 // copy asset id on click (or have button)
 
                 // fold result into a node tree.
-                const records = {};
-                const assets = {};
-                raw.forEach(rawRecord => {
-                    const record = records[rawRecord.id] =
-                    {
-                        id: rawRecord.id,
-                        label: (rawRecord.path ? rawRecord.path + "\\" : "") + rawRecord.name,
-                        type: rawRecord.recordType,
-                        size: 5,
-                        assets: [],
-                    };
 
-                    rawRecord.neosDBmanifest.forEach(rawAsset => {
-                        // Omit the core font list, they connect to anything with text.
-                        // Really you'll never get rid of these, and they make the graph
-                        // more difficult to understand.
-                        if (coreFontList[rawAsset.hash]) {
-                            return;
-                        }
+                const convertedData = convertRecords(raw, coreFontList);
 
-                        var asset = assets[rawAsset.hash];
-                        if (asset === undefined) {
-                            asset = assets[rawAsset.hash] = {
-                                id: rawAsset.hash,
-                                label: `${rawAsset.hash} ${rawAsset.bytes} bytes`,
-                                type: "asset",
-                                size: rawAsset.bytes,
-                                records: []
-                            };
-                        }
-                        // Because we go through records in sequence,
-                        // we can build a strong key out of the order the nodes are referenced.
-                        asset.records.push(record.id);
-                        record.assets.push(asset);
-                    });
-                });
+                console.log(`Total of ${convertedData.records.length} records referenced ${Object.keys(convertedData.assets).length} assets.`);
 
-                var nodes = [];
-                var links = [];
+                const mergeAssets = document.getElementById('merge-assets').checked;
 
-                if (document.getElementById('merge-assets').checked) {
-                    nodes = Object.values(records);
+                const graph = recordsToGraph(convertedData, mergeAssets);
 
-                    // for each record, find all assets where the list of assets are similar.
-                    const groups = _.groupBy(assets, 'records');
-                    for (const aggregate in groups) {
-                        const group = groups[aggregate];
-                        const size = group.reduce((c, g) => c + g.size, 0);
-                        const node = {
-                            id: group.reduce((a, v) => a != "" ? a + "," + v.label : v.label, ""),
-                            label: `${group.length} nodes, ${size} bytes total<br>` + group.reduce((a, v) => a != "" ? a + "<br>" + v.label : v.label, ""),
-                            size,
-                            type: "asset"
-                        };
-                        nodes.push(node);
-
-                        group[0].records.forEach(r => links.push({
-                            source: r,
-                            target: node.id
-                        }));
-                    }
-                }
-                else {
-                    nodes = Object.values(records).concat(Object.values(assets));
-                    links = nodes.flatMap(n => n.assets ? n.assets.map(a => ({ source: n.id, target: a.id })) : []);
-                }
-
-                const graph = {
-                    nodes: nodes,
-                    links: links
-                };
                 console.log(graph);
                 console.log(`Total of ${graph.nodes.reduce((c, n) => c + (n.size ? n.size : 0), 0)} bytes accounted for`)
-
-                function mapColor(type) {
-                    switch (type) {
-                        case "asset":
-                            return "#f5b84e";
-                        case "world":
-                            return "#4e59f5";
-                        case "texture":
-                            return "#c64ef5";
-                        case "object":
-                            return "#f54e4e";
-                    }
-                    return "#ffffff";
-                }
 
                 var logVal = parseFloat(document.getElementById('log-power').value);
 
                 const controlType = document.getElementById('control-type');
+                const locomotion = controlType.options[controlType.selectedIndex].value;
 
-                const myGraph = (document.getElementById('3d').checked ? ForceGraph3D : ForceGraph)({
-                    controlType: controlType.options[controlType.selectedIndex].value
-                });
-                const graphInstance = myGraph(document.getElementById('graph-container'))
-                    .graphData(graph)
-                    .nodeLabel(n => {
-                        if (!showLabels.checked) {
-                            return;
-                        }
-                        return n.label;
-                    }).nodeColor(n => mapColor(n.type))
-                    .linkColor(() => 'rgba(255,255,255,0.2)')
-                    .nodeVal(n => {
-                        const result = n.size > 0 ? Math.log(n.size) / Math.log(logVal) : 1;
-                        return result;
-                    })
-                    .enableNodeDrag(document.getElementById('allow-dragging').checked);
+                const in3d = document.getElementById('3d').checked;
+
+                const container = document.getElementById('graph-container');
+
+                const allowDragging = document.getElementById('allow-dragging').checked;
+
+                const showLabels = document.getElementById('show-labels');
+
+                createGraph(container, graph, locomotion, in3d, () => showLabels.checked, logVal, allowDragging)
 
                 // If we get to this point, we loaded the graph successfully.
                 // Disable the selector as a signal for that.
