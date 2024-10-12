@@ -1,7 +1,7 @@
 <html>
 
 <head>
-    <title>Neos Inventory Plotter</title>
+    <title>Resonite Inventory Plotter</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
     <style type="text/css">
         #graph-container {
@@ -89,8 +89,7 @@
                 Nodes with few edges (such as the probable outer sphere of nodes) are good candidates to remove,
                 as removing one item from your inventory will release all assets linked to that node.
                 <br>
-                Green nodes do not count towards your storage cap, this is assets in Neos Essentials and Essential
-                Tools.
+                Green nodes do not count towards your storage cap (possibly, the list is old).
             </p>
         </div>
         <script>
@@ -105,8 +104,9 @@
     <div id="graph-container"></div>
     <script>
 
-        const linkPrefix = "neosdb:///";
+        const linkPrefix = "resdb:///";
         const linkSuffix = ".7zbson";
+        const linkSuffix2 = ".brson";
 
         function convertRecords(rawJson, omitFree) {
             const zeroSize = [];
@@ -115,7 +115,7 @@
             const assets = {};
             rawJson.forEach(rawRecord => {
 
-                const manifestAssetId = rawRecord.assetUri.replace(linkPrefix, '').replace(linkSuffix, '');
+                const manifestAssetId = rawRecord.assetUri.replace(linkPrefix, '').replace(linkSuffix, '').replace(linkSuffix2, '');
                 const record = {
                     id: rawRecord.id,
                     label: (rawRecord.path ? rawRecord.path + "\\" : "") + rawRecord.name,
@@ -124,7 +124,7 @@
                 };
                 records.push(record);
 
-                rawRecord.neosDBmanifest.forEach(rawAsset => {
+                rawRecord.assetManifest.forEach(rawAsset => {
                     // Omit the core font list, they connect to anything with text.
                     // Really you'll never get rid of these, and they make the graph
                     // more difficult to understand.
