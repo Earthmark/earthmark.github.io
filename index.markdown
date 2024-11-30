@@ -6,4 +6,4 @@ layout: home
 author_profile: true
 ---
 
-Extra stuff let's see where this goes
+Project links will go here eventually.
