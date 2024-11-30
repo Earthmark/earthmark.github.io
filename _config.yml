@@ -22,14 +22,37 @@ domain: earthmark.dev
 baseurl: ""
 url: "https://earthmark.dev"
 github_username: earthmark
-title: Earthmarks Works
-description: >-
-  Earthmark's projects and links
+title: Earthmark.dev
+subtitle: Software Engineer, Coyote Furry, VR enthusiast
+name: Earthmark
+description: Personal page for Earthmark the software engineer
+repository: earthmark/earthmark.github.io
+
+author:
+  name        : "Earthmark"
+  bio         : "Math is a pretty good time."
+  avatar      : "/assets/images/kezerin-gd-1.jpg"
+
+footer:
+  links:
+    - label: "Discord"
+      icon: "fa-brands fa-discord"
+      url: "https://discordapp.com/users/105400145255919616"
+    - label: "Bluesky"
+      icon: "fa-brands fa-bluesky"
+      url: "https://bsky.app/profile/earthmark.dev"
+    - label: "Github"
+      icon: "fa-brands fa-github"
+      url: "https://github.com/Earthmark"
 
 # Build settings
-theme: minima
+remote_theme: "mmistakes/minimal-mistakes@4.26.2"
+minimal_mistakes_skin: dirt
 plugins:
   - jekyll-feed
+  - jekyll-include-cache
+  - jekyll-sitemap
+  - jekyll-data
 
 # Exclude from processing.
 # The following items will not be processed, by default.
