@@ -5,5 +5,3 @@
 layout: home
 author_profile: true
 ---
-
-Project links will go here eventually.
